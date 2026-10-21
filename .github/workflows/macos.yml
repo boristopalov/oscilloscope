@@ -1,0 +1,93 @@
+name: macOS build and package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Apple Silicon development package
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare build tools
+        run: |
+          test "$(uname -m)" = arm64
+          cmake --version
+          python3 --version
+          if ! command -v ninja >/dev/null; then
+            brew install ninja
+          fi
+
+      - name: Check release tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: test "$RELEASE_TAG" = "v$(cat VERSION)"
+
+      - name: Build and package without tests
+        run: scripts/package-macos.sh --mode development --parallel 3
+
+      - name: Upload development installer and checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macOS-arm64-development-${{ github.sha }}
+          path: |
+            dist/development/*.pkg
+            dist/development/*.zip
+            dist/development/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  draft-development-release:
+    name: Draft development prerelease
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download the completed development package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: macOS-arm64-development-${{ github.sha }}
+          path: dist
+
+      - name: Create a draft development prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Development build for macOS 12+ on Apple Silicon, VST3 only.
+
+          The plugin is ad-hoc signed. The installer is unsigned and has not been
+          notarized by Apple. macOS may block the downloaded package. This is a
+          development artifact, not a production release.
+
+          Quit your audio host before installation. See README.md and
+          docs/distribution.md in the source tree for requirements and setup.
+          SHA256SUMS covers the installer and ZIP archive.
+          NOTES
+          gh release create "$RELEASE_TAG" dist/* \
+            --verify-tag --draft --prerelease \
+            --title "Oscilloscope $RELEASE_TAG (development)" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

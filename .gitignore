@@ -1,0 +1,37 @@
+/build*/
+/.deps/
+/captures/
+/dist/
+/.lavish/
+/experiments/
+/tasks/
+/MVP-PLAN.md
+/docs/*
+!/docs/distribution.md
+!/docs/ci.md
+
+# Local agent configuration, credentials and signing material.
+/.agents/
+/.codex/
+/.aws/
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+
+# Generated captures, installers and local metadata.
+*.csv
+*.wav
+*.aiff
+*.pkg
+*.zip
+.DS_Store
+__pycache__/
+*.py[cod]

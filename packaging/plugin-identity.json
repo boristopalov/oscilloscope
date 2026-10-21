@@ -1,0 +1,8 @@
+{
+  "product_name": "Oscilloscope",
+  "company_name": "Oscilloscope",
+  "bundle_identifier": "local.oscilloscope.plugin",
+  "manufacturer_code": "Osco",
+  "plugin_code": "Osc1",
+  "installer_identifier": "local.oscilloscope.plugin.installer"
+}
